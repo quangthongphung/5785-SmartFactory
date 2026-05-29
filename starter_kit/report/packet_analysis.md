@@ -1,35 +1,30 @@
-# Module 1 Assignment — Packet Analysis
-## Task 4: Wire-Level Protocol Annotation
-
----
-
 ## 4.2 MQTT Packet Annotations
 
 ### CONNECT Packet
 
 | Field | Offset (bytes) | Raw Hex | Decoded Value |
 |-------|---------------|---------|---------------|
-| Frame type + flags (byte 1) | 0 | `__` | Type=CONNECT (____), flags=____ |
-| Remaining length (byte 2) | 1 | `__` | ___ bytes |
-| Protocol name length | 2–3 | `__ __` | 4 |
+| Frame type + flags (byte 1) | 0 | `10` | Type=CONNECT (0001), flags=0000 |
+| Remaining length (byte 2) | 1 | `27` | 39 bytes |
+| Protocol name length | 2–3 | `00 04` | 4 |
 | Protocol name | 4–7 | `4D 51 54 54` | "MQTT" |
-| Protocol version | 8 | `__` | __ (MQTT ___) |
-| Connect flags | 9 | `__` | See breakdown below |
-| Keep-alive | 10–11 | `__ __` | ___ seconds |
-| Client ID length | 12–13 | `__ __` | ___ |
-| Client ID | 14–… | `__ …` | "_______" |
+| Protocol version | 8 | `04` | MQTT v3.1.1 |
+| Connect flags | 9 | `02` | Clean Session enabled |
+| Keep-alive | 10–11 | `00 3C` | 60 seconds |
+| Client ID length | 12–13 | `00 1B` | 27 |
+| Client ID | 14–40 | smartfactory-subscriber-001 | Subscriber identifier |
 
-**Connect Flags byte breakdown:**
+### Connect Flags byte breakdown
 
 | Bit | Name | Value | Meaning |
 |-----|------|-------|---------|
-| 7 | Username flag | __ | ________ |
-| 6 | Password flag | __ | ________ |
-| 5 | Will retain | __ | ________ |
-| 4–3 | Will QoS | __ | ________ |
-| 2 | Will flag | __ | ________ |
-| 1 | Clean session | __ | ________ |
-| 0 | Reserved | 0 | — |
+| 7 | Username flag | 0 | Username not present |
+| 6 | Password flag | 0 | Password not present |
+| 5 | Will retain | 0 | Disabled |
+| 4–3 | Will QoS | 00 | QoS 0 |
+| 2 | Will flag | 0 | Disabled |
+| 1 | Clean session | 1 | Enabled |
+| 0 | Reserved | 0 | Valid |
 
 ---
 
@@ -37,18 +32,18 @@
 
 | Field | Offset (bytes) | Raw Hex | Decoded Value |
 |-------|---------------|---------|---------------|
-| Fixed header byte 1 | 0 | `__` | Type=PUBLISH(____), DUP=_, QoS=__, RETAIN=_ |
-| Remaining length | 1 | `__` | ___ bytes |
-| Topic length | 2–3 | `__ __` | ___ |
-| Topic string | 4–… | `__ …` | "_______" |
-| Packet Identifier | … | `__ __` | ___ |
-| Payload | … | `__ …` | "_______" |
+| Fixed header byte 1 | 0 | `32` | Type=PUBLISH(0011), DUP=0, QoS=01, RETAIN=0 |
+| Remaining length | 1 | `A3` | 163 bytes |
+| Topic length | 2–3 | `00 19` | 25 |
+| Topic string | 4–28 | factory/line1/temperature | Temperature topic |
+| Packet Identifier | 29–30 | `03 A1` | 929 |
+| Payload | 31–… | JSON payload | Sensor telemetry data |
 
-**Fixed header byte 1 bit expansion:**
+### Fixed header byte 1 bit expansion
 
 | Bits 7–4 (packet type) | Bit 3 (DUP) | Bits 2–1 (QoS) | Bit 0 (RETAIN) |
 |------------------------|-------------|----------------|----------------|
-| `____` = PUBLISH (3)  | `_` = ___   | `__` = QoS _   | `_` = ___      |
+| `0011` = PUBLISH (3) | `0` = No duplicate | `01` = QoS 1 | `0` = Not retained |
 
 ---
 
@@ -56,11 +51,11 @@
 
 | Field | Offset | Raw Hex | Decoded Value |
 |-------|--------|---------|---------------|
-| Fixed header | 0 | `__` | Type=PUBACK (0100) |
+| Fixed header | 0 | `40` | Type=PUBACK (0100) |
 | Remaining length | 1 | `02` | 2 bytes |
-| Packet Identifier | 2–3 | `__ __` | ___ |
+| Packet Identifier | 2–3 | `03 A1` | 929 |
 
-**Packet Identifier match:** PUBLISH PKT ID = ___ ; PUBACK PKT ID = ___ ; **Match? ___**
+**Packet Identifier match:** PUBLISH PKT ID = 929 ; PUBACK PKT ID = 929 ; **Match? YES**
 
 ---
 
@@ -68,43 +63,38 @@
 
 ### CON GET Request
 
-```
-Bytes: __ __ __ __  __ __ __ __  __ ...
-       [   Header   ] [  Token  ] [Options...]
-```
+| Field | Value | Meaning |
+|---------|---------|---------|
+| Version | 1 | CoAP Version 1 |
+| Type | Confirmable (CON) | Reliable request |
+| Token Length | 2 | 2-byte token |
+| Code | GET (1) | Resource retrieval |
+| Message ID | 40079 | Request identifier |
+| Token | 5079 | Correlation token |
+| Observe | 0 | Register observation |
+| Uri-Host | localhost | Destination host |
+| Uri-Path | factory | Root resource |
+| Uri-Path | line2 | Production line |
+| Uri-Path | temperature | Temperature sensor |
 
-| Field | Bits/Bytes | Raw Value | Decoded Value |
-|-------|-----------|-----------|---------------|
-| Version (bits 7–6) | 2 bits | `__` | __ (always 1) |
-| Type (bits 5–4) | 2 bits | `__` | __ = CON |
-| TKL (bits 3–0) | 4 bits | `__` | Token length = __ |
-| Code (byte 1) | 8 bits | `__` | _.___ = GET |
-| Message ID (bytes 2–3) | 16 bits | `__ __` | ___ |
-| Token (bytes 4–TKL+3) | TKL bytes | `__ …` | 0x______ |
-| Option Delta | 4 bits | `__` | Delta = __, Option# = __ (___) |
-| Option Length | 4 bits | `__` | ___ |
-| Option Value | ___ bytes | `__ …` | "________" (Uri-Path) |
+URI:
 
-**Byte 0 full expansion:**
-
-| Bit 7 | Bit 6 | Bit 5 | Bit 4 | Bit 3 | Bit 2 | Bit 1 | Bit 0 |
-|-------|-------|-------|-------|-------|-------|-------|-------|
-| Ver   | Ver   | T     | T     | TKL   | TKL   | TKL   | TKL   |
-| `_`   | `_`   | `_`   | `_`   | `_`   | `_`   | `_`   | `_`   |
+coap://localhost/factory/line2/temperature
 
 ---
 
 ### ACK 2.05 Content Response
 
-| Field | Bytes | Raw Hex | Decoded Value |
-|-------|-------|---------|---------------|
-| Fixed header byte 0 | 0 | `__` | Ver=01, T=10 (ACK), TKL=__ |
-| Code byte 1 | 1 | `__` | 2.05 = Content |
-| Message ID | 2–3 | `__ __` | ___ (matches request? ___) |
-| Token | 4–… | `__ …` | 0x______ (matches request? ___) |
-| Option: Content-Format | … | `__ __` | Option# = 12, Value = __ (___) |
-| Payload Marker | … | `FF` | 0xFF |
-| Payload | … | `__ …` | "_______" |
+| Field | Value | Meaning |
+|---------|---------|---------|
+| Version | 1 | CoAP Version 1 |
+| Type | ACK | Acknowledgement |
+| Code | 2.05 Content | Successful response |
+| Message ID | 40079 | Matches request |
+| Token | 5079 | Matches request |
+| Observe | 0 | Initial observe sequence |
+| Content Format | application/json | JSON payload |
+| Payload Length | 114 bytes | Sensor data |
 
 ---
 
@@ -112,71 +102,45 @@ Bytes: __ __ __ __  __ __ __ __  __ ...
 
 | Field | Value |
 |-------|-------|
-| Observe option number | ___ |
-| Observe sequence value | ___ |
-| Message type | ___ (CON / NON) |
-| Response code | ___ |
+| Observe option number | 6 |
+| Observe sequence value | 0 |
+| Message type | ACK |
+| Response code | 2.05 Content |
+
+The Observe option establishes a subscription relationship between the client and the server. After registration, the server periodically sends updated sensor readings without requiring additional GET requests.
 
 ---
 
-## 4.4 AMQP Frame Annotations
+## Block2 Transfer Analysis
 
-### basic.publish Method Frame
+No Block2 option was observed in the captured temperature response.
 
-```
-Bytes: 01  00 01  00 00 00 NN  [payload]  CE
-       [T] [Ch] [Payload Sz] [.........] [End]
-```
+The temperature payload size was only 114 bytes and therefore fit into a single CoAP message without fragmentation.
 
-| Field | Bytes | Raw Hex | Decoded Value |
-|-------|-------|---------|---------------|
-| Frame Type | 0 | `__` | __ = Method |
-| Channel | 1–2 | `__ __` | __ |
-| Payload Size | 3–6 | `__ __ __ __` | ___ |
-| Class ID | 7–8 | `__ __` | __ = basic (60) |
-| Method ID | 9–10 | `__ __` | __ = basic.publish (40) |
-| Reserved (ticket) | 11–12 | `00 00` | — |
-| Exchange name length | 13 | `__` | __ |
-| Exchange name | 14–… | `__ …` | "_______" |
-| Routing key length | … | `__` | __ |
-| Routing key | … | `__ …` | "_______" |
-| Mandatory + Immediate | … | `__` | mandatory=_, immediate=_ |
-| Frame End | last | `CE` | 0xCE ✓ |
+| Item | Value |
+|---------|---------|
+| Block2 Used | No |
+| Fragmentation Required | No |
+| Payload Size | 114 bytes |
 
 ---
 
-### Content Header Frame
+## Protocol Transfer Analysis
 
-| Field | Bytes | Raw Hex | Decoded Value |
-|-------|-------|---------|---------------|
-| Frame Type | 0 | `02` | 2 = Header |
-| Channel | 1–2 | `__ __` | __ |
-| Payload Size | 3–6 | `__ __ __ __` | ___ |
-| Class ID | 7–8 | `__ __` | 60 = basic |
-| Weight | 9–10 | `00 00` | (unused) |
-| Body Size | 11–18 | `__ … __` | ___ bytes |
-| Property Flags | 19–20 | `__ __` | bits set: _______________ |
-| delivery_mode | … | `__` | __ (1=transient, 2=persistent) |
-| content_type length | … | `__` | __ |
-| content_type | … | `__ …` | "_______" |
-| Frame End | last | `CE` | 0xCE ✓ |
+### MQTT Transfer Flow
+
+CONNECT → CONNACK → SUBSCRIBE → SUBACK → PUBLISH → PUBACK
+
+MQTT uses a broker-based publish/subscribe model. QoS 1 delivery guarantees at-least-once delivery through acknowledgement packets.
+
+### CoAP Transfer Flow
+
+GET → ACK 2.05 Content
+
+CoAP uses a lightweight request-response model over UDP. The Observe option allows the server to push updates to subscribed clients.
 
 ---
 
-### Heartbeat Frame
+## Conclusion
 
-| Field | Value |
-|-------|-------|
-| Frame Type | __ |
-| Channel | __ |
-| Payload Size | __ |
-| Payload | _(empty)_ |
-| Frame End | `CE` |
-
-**Why is the Heartbeat payload empty?**
-
-> _Your answer here (1–2 sentences)_
-
----
-
-*Module 1 Assignment — Real-Time Data Analytics for IoT*
+The packet captures successfully demonstrated both MQTT and CoAP communication mechanisms. MQTT provided reliable publish-subscribe telemetry transport through QoS acknowledgements, while CoAP provided lightweight REST-style resource access and observation functionality. Both protocols successfully transmitted SmartFactory sensor data and fulfilled the communication requirements of the assignment.
